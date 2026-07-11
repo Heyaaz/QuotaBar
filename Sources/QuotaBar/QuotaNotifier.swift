@@ -13,12 +13,20 @@ struct QuotaAlert: Equatable, Sendable {
         guard let previous, previous.provider == current.provider else { return [] }
 
         return current.windows.compactMap { window in
-            guard let oldPercent = previous.windows.first(where: {
+            guard let oldWindow = previous.windows.first(where: {
                 $0.durationMinutes == window.durationMinutes
-            })?.remainingPercent else { return nil }
+            }) else { return nil }
+
+            if oldWindow.resetsAt != nil || window.resetsAt != nil {
+                guard
+                    let oldReset = oldWindow.resetsAt,
+                    let newReset = window.resetsAt,
+                    abs(oldReset.timeIntervalSince(newReset)) < 60
+                else { return nil }
+            }
 
             guard let threshold = [5, 20].first(where: {
-                oldPercent > $0 && window.remainingPercent <= $0
+                oldWindow.remainingPercent > $0 && window.remainingPercent <= $0
             }) else { return nil }
 
             return QuotaAlert(

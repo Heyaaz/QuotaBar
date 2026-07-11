@@ -143,6 +143,15 @@ func alertsOnlyWhenQuotaCrossesAThreshold() {
     #expect(QuotaAlert.crossings(from: nil, to: current).isEmpty)
     #expect(QuotaAlert.crossings(from: previous, to: current).map(\.threshold) == [20, 5])
     #expect(QuotaAlert.crossings(from: current, to: current).isEmpty)
+
+    let newPeriod = ProviderSnapshot(
+        provider: .claude,
+        windows: [
+            QuotaWindow(durationMinutes: 300, remainingPercent: 4, resetsAt: .distantFuture),
+        ],
+        fetchedAt: .distantFuture
+    )
+    #expect(QuotaAlert.crossings(from: previous, to: newPeriod).isEmpty)
 }
 
 @Test @MainActor
