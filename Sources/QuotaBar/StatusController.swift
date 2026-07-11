@@ -1,4 +1,5 @@
 import AppKit
+import ServiceManagement
 
 @MainActor
 final class StatusController: NSObject {
@@ -95,6 +96,7 @@ private final class UsagePopoverController: NSViewController {
     private let store: UsageStore
     private let contentStack = NSStackView()
     private let refreshButton = NSButton()
+    private let settingsButton = NSButton()
     private let spinner = NSProgressIndicator()
 
     init(store: UsageStore) {
@@ -229,13 +231,22 @@ private final class UsagePopoverController: NSViewController {
         let updated = latest.map { "Updated \(Self.updatedFormatter.string(from: $0))" } ?? "Not updated yet"
         let label = text(updated, size: 10, color: .tertiaryLabelColor)
         let spacer = NSView()
+
+        settingsButton.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: "Settings")
+        settingsButton.bezelStyle = .accessoryBarAction
+        settingsButton.isBordered = false
+        settingsButton.target = self
+        settingsButton.action = #selector(showSettings)
+        settingsButton.setAccessibilityLabel("Settings")
+
         let quit = NSButton(title: "Quit", target: NSApp, action: #selector(NSApplication.terminate(_:)))
         quit.bezelStyle = .accessoryBarAction
         quit.controlSize = .small
 
-        let row = NSStackView(views: [label, spacer, quit])
+        let row = NSStackView(views: [label, spacer, settingsButton, quit])
         row.orientation = .horizontal
         row.alignment = .centerY
+        row.spacing = 7
         row.widthAnchor.constraint(equalToConstant: 308).isActive = true
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
         return row
@@ -255,6 +266,44 @@ private final class UsagePopoverController: NSViewController {
 
     @objc private func refresh() {
         Task { await store.refresh() }
+    }
+
+    @objc private func showSettings() {
+        let launchAtLogin = NSMenuItem(
+            title: "Launch at Login",
+            action: #selector(toggleLaunchAtLogin),
+            keyEquivalent: ""
+        )
+        launchAtLogin.target = self
+        launchAtLogin.state = switch SMAppService.mainApp.status {
+        case .enabled: .on
+        case .requiresApproval: .mixed
+        default: .off
+        }
+
+        let menu = NSMenu()
+        menu.addItem(launchAtLogin)
+        menu.popUp(
+            positioning: nil,
+            at: NSPoint(x: 0, y: settingsButton.bounds.maxY),
+            in: settingsButton
+        )
+    }
+
+    @objc private func toggleLaunchAtLogin() {
+        let service = SMAppService.mainApp
+        do {
+            switch service.status {
+            case .enabled:
+                try service.unregister()
+            case .requiresApproval:
+                SMAppService.openSystemSettingsLoginItems()
+            default:
+                try service.register()
+            }
+        } catch {
+            NSAlert(error: error).runModal()
+        }
     }
 
     private static let resetFormatter: DateFormatter = {
