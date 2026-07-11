@@ -38,3 +38,22 @@ func readsClaudeUsageWhenLiveTestsAreEnabled() async throws {
     let snapshot = try await ClaudeProvider().fetch()
     #expect(!snapshot.windows.isEmpty)
 }
+
+@Test
+func parsesGrokWeeklyWindow() throws {
+    let json = #"{"jsonrpc":"2.0","id":2,"result":{"config":{"creditUsagePercent":21.5,"currentPeriod":{"type":"USAGE_PERIOD_TYPE_WEEKLY","end":"2026-07-18T14:35:45.502164+00:00"}}}}"#
+    let snapshot = try GrokProvider.parseBilling(Data(json.utf8), fetchedAt: .distantPast)
+
+    #expect(snapshot.provider == .grok)
+    #expect(snapshot.windows.map(\.shortLabel) == ["W"])
+    #expect(snapshot.windows.map(\.remainingPercent) == [78])
+    #expect(snapshot.windows[0].resetsAt != nil)
+}
+
+@Test
+func readsGrokUsageWhenLiveTestsAreEnabled() async throws {
+    guard ProcessInfo.processInfo.environment["QUOTABAR_LIVE_TESTS"] == "1" else { return }
+
+    let snapshot = try await GrokProvider().fetch()
+    #expect(snapshot.windows.count == 1)
+}

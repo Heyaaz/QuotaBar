@@ -12,7 +12,7 @@ final class JSONLineProcess {
         process.arguments = arguments
         process.standardInput = input
         process.standardOutput = output
-        process.standardError = Pipe()
+        process.standardError = FileHandle.nullDevice
 
         do {
             try process.run()
@@ -27,7 +27,7 @@ final class JSONLineProcess {
     }
 
     func send(_ object: [String: Any]) throws {
-        var data = try JSONSerialization.data(withJSONObject: object)
+        var data = try JSONSerialization.data(withJSONObject: object, options: [.withoutEscapingSlashes])
         data.append(0x0A)
         try input.fileHandleForWriting.write(contentsOf: data)
     }
@@ -44,8 +44,9 @@ final class JSONLineProcess {
                 return Data(line)
             }
 
-            let chunk = output.fileHandleForReading.availableData
-            if chunk.isEmpty { throw ProviderError.timedOut }
+            guard let chunk = try output.fileHandleForReading.read(upToCount: 1), !chunk.isEmpty else {
+                throw ProviderError.timedOut
+            }
             buffer.append(chunk)
         }
     }
@@ -60,4 +61,3 @@ final class JSONLineProcess {
         close()
     }
 }
-
