@@ -1,0 +1,7 @@
+.build/
+.DS_Store
+.interview/
+work/
+outputs/
+QuotaBar.app/
+
