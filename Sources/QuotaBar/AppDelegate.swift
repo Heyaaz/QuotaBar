@@ -2,17 +2,15 @@ import AppKit
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private var statusItem: NSStatusItem?
+    private let store = UsageStore()
+    private var statusController: StatusController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.title = "QuotaBar"
+        statusController = StatusController(store: store)
+        store.start()
+    }
 
-        let menu = NSMenu()
-        menu.addItem(withTitle: "Quit QuotaBar", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-        item.menu = menu
-
-        statusItem = item
+    func applicationWillTerminate(_ notification: Notification) {
+        store.stop()
     }
 }
-
