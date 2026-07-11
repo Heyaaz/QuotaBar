@@ -4,6 +4,13 @@ QuotaBar is a small, read-only macOS menu bar app that shows the remaining subsc
 
 The menu bar shows all three providers at once, identified by their logos. Each provider displays only the windows it actually returns, such as `5h` and `W`; missing windows are never estimated. If a refresh fails, the last successful value remains visible and the details popover marks it as stale.
 
+## Features
+
+- Refreshes Claude, Codex, and Grok quota every five minutes using existing OAuth sessions
+- Sends a native notification when a quota first crosses 20% or 5% remaining
+- Offers full and lowest-only menu bar display modes
+- Can launch automatically at login through the gear menu
+
 ## Requirements
 
 - macOS 14 or later
@@ -20,7 +27,7 @@ QuotaBar reuses the official clients' existing OAuth sessions. It does not accep
 open outputs/QuotaBar.zip
 ```
 
-Unzip `QuotaBar.zip`, move `QuotaBar.app` to Applications if desired, and open it. The app has no Dock icon. Click its menu bar text to see reset times, refresh manually, or quit. Values refresh automatically every five minutes.
+Unzip `QuotaBar.zip`, move `QuotaBar.app` to Applications if desired, and open it. The app has no Dock icon. Click its menu bar text to see reset times, refresh manually, or quit. The gear menu controls launch at login and menu bar display mode.
 
 ## Verify
 
@@ -29,7 +36,7 @@ swift test
 QUOTABAR_LIVE_TESTS=1 swift test
 ```
 
-Live tests require all three clients to be signed in. The packaged app measured 42,480 KB RSS after refreshing all providers, with no persistent child process, on the development Mac.
+Live tests require all three clients to be signed in. The packaged app measured 42,544 KB RSS after refreshing all providers, with no persistent child process, on the development Mac.
 
 ## Privacy
 
