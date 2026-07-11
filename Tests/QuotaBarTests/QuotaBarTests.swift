@@ -120,3 +120,27 @@ func decodesCompactMenuBarLogos() {
         #expect(image.size.height == 13)
     }
 }
+
+@Test
+func alertsOnlyWhenQuotaCrossesAThreshold() {
+    let previous = ProviderSnapshot(
+        provider: .claude,
+        windows: [
+            QuotaWindow(durationMinutes: 300, remainingPercent: 21, resetsAt: nil),
+            QuotaWindow(durationMinutes: 10_080, remainingPercent: 6, resetsAt: nil),
+        ],
+        fetchedAt: .distantPast
+    )
+    let current = ProviderSnapshot(
+        provider: .claude,
+        windows: [
+            QuotaWindow(durationMinutes: 300, remainingPercent: 19, resetsAt: nil),
+            QuotaWindow(durationMinutes: 10_080, remainingPercent: 4, resetsAt: nil),
+        ],
+        fetchedAt: .distantFuture
+    )
+
+    #expect(QuotaAlert.crossings(from: nil, to: current).isEmpty)
+    #expect(QuotaAlert.crossings(from: previous, to: current).map(\.threshold) == [20, 5])
+    #expect(QuotaAlert.crossings(from: current, to: current).isEmpty)
+}

@@ -9,6 +9,7 @@ final class UsageStore: NSObject {
 
     private(set) var states: [ProviderID: ProviderState]
     var onChange: (() -> Void)?
+    var onSnapshotUpdate: ((ProviderSnapshot?, ProviderSnapshot) -> Void)?
 
     init(
         providers: [any UsageProvider] = [ClaudeProvider(), CodexProvider(), GrokProvider()],
@@ -69,7 +70,9 @@ final class UsageStore: NSObject {
         for (id, result) in results {
             switch result {
             case .success(let snapshot):
+                let previous = states[id]?.snapshot
                 states[id] = ProviderState(snapshot: snapshot)
+                onSnapshotUpdate?(previous, snapshot)
             case .failure(let error):
                 var state = states[id, default: ProviderState()]
                 state.errorMessage = error.localizedDescription
@@ -131,4 +134,3 @@ private extension JSONDecoder {
         return decoder
     }
 }
-
