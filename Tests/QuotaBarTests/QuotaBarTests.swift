@@ -57,3 +57,36 @@ func readsGrokUsageWhenLiveTestsAreEnabled() async throws {
     let snapshot = try await GrokProvider().fetch()
     #expect(snapshot.windows.count == 1)
 }
+
+@Test @MainActor
+func keepsSuccessfulProvidersWhenAnotherFails() async {
+    let now = Date()
+    let snapshot = ProviderSnapshot(
+        provider: .claude,
+        windows: [QuotaWindow(durationMinutes: 300, remainingPercent: 75, resetsAt: nil)],
+        fetchedAt: now
+    )
+    let cache = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+    let store = UsageStore(
+        providers: [
+            StubProvider(id: .claude, result: .success(snapshot)),
+            StubProvider(id: .codex, result: .failure(.notAuthenticated)),
+        ],
+        cacheURL: cache
+    )
+
+    await store.refresh()
+
+    #expect(store.states[.claude]?.snapshot == snapshot)
+    #expect(store.states[.codex]?.errorMessage != nil)
+    #expect(store.states[.claude]?.errorMessage == nil)
+}
+
+private struct StubProvider: UsageProvider {
+    let id: ProviderID
+    let result: Result<ProviderSnapshot, ProviderError>
+
+    func fetch() async throws -> ProviderSnapshot {
+        try result.get()
+    }
+}

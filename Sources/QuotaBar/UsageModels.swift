@@ -27,7 +27,7 @@ struct ProviderSnapshot: Codable, Equatable, Sendable {
     let fetchedAt: Date
 }
 
-enum ProviderError: LocalizedError, Equatable {
+enum ProviderError: LocalizedError, Equatable, Sendable {
     case executableNotFound(String)
     case notAuthenticated
     case invalidResponse
@@ -50,3 +50,9 @@ protocol UsageProvider: Sendable {
     func fetch() async throws -> ProviderSnapshot
 }
 
+struct ProviderState: Equatable, Sendable {
+    var snapshot: ProviderSnapshot?
+    var errorMessage: String?
+    var isRefreshing = false
+    var isStale = false
+}
