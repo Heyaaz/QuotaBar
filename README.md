@@ -17,10 +17,10 @@ QuotaBar reuses the official clients' existing OAuth sessions. It does not accep
 
 ```sh
 ./Scripts/package.sh
-open outputs/QuotaBar.app
+open outputs/QuotaBar.zip
 ```
 
-The app has no Dock icon. Click its menu bar text to see reset times, refresh manually, or quit. Values refresh automatically every five minutes.
+Unzip `QuotaBar.zip`, move `QuotaBar.app` to Applications if desired, and open it. The app has no Dock icon. Click its menu bar text to see reset times, refresh manually, or quit. Values refresh automatically every five minutes.
 
 ## Verify
 
