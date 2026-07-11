@@ -45,67 +45,30 @@ struct GrokProvider: UsageProvider {
 
     private static func readBilling(executable: String) async throws -> Data {
         try await Task.detached {
-            let client = try JSONLineProcess(
-                executable: executable,
-                arguments: ["--no-subagents", "--no-auto-update", "agent", "stdio"],
-                timeoutSeconds: 20
+            let process = Process()
+            let output = Pipe()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/expect")
+            process.arguments = ["-c", Self.expectScript]
+            process.environment = ProcessInfo.processInfo.environment.merging(
+                ["QUOTABAR_GROK_BIN": executable],
+                uniquingKeysWith: { _, new in new }
             )
-            defer { client.close() }
+            process.standardOutput = output
+            process.standardError = FileHandle.nullDevice
 
-            try client.send([
-                "jsonrpc": "2.0",
-                "id": 0,
-                "method": "initialize",
-                "params": [
-                    "protocolVersion": 1,
-                    "clientCapabilities": [
-                        "fs": ["readTextFile": false, "writeTextFile": false],
-                        "terminal": false,
-                    ],
-                ],
-            ])
             do {
-                _ = try client.read(id: 0)
+                try process.run()
             } catch {
-                throw ProviderError.processFailed("Grok initialize failed: \(error.localizedDescription)")
+                throw ProviderError.processFailed("Could not start the Grok usage request.")
             }
 
-            try client.send([
-                "jsonrpc": "2.0",
-                "id": 1,
-                "method": "authenticate",
-                "params": [
-                    "methodId": "cached_token",
-                    "_meta": ["headless": true],
-                ],
-            ])
-            let auth: Data
-            do {
-                auth = try client.read(id: 1)
-            } catch {
-                throw ProviderError.processFailed("Grok authentication failed: \(error.localizedDescription)")
+            let data = try output.fileHandleForReading.readToEnd() ?? Data()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0, !data.isEmpty else {
+                throw ProviderError.processFailed("Grok usage request failed.")
             }
-            if Self.hasError(auth) { throw ProviderError.notAuthenticated }
-
-            try client.send([
-                "jsonrpc": "2.0",
-                "id": 2,
-                "method": "_x.ai/billing",
-                "params": [:],
-            ])
-            do {
-                return try client.read(id: 2)
-            } catch {
-                throw ProviderError.processFailed("Grok usage request failed: \(error.localizedDescription)")
-            }
+            return data
         }.value
-    }
-
-    private static func hasError(_ data: Data) -> Bool {
-        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return true
-        }
-        return object["error"] != nil
     }
 
     private static func number(_ value: Any?) -> Double? {
@@ -126,4 +89,28 @@ struct GrokProvider: UsageProvider {
 
         return candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
     }
+
+    private static let expectScript = #"""
+    log_user 0
+    set timeout 20
+    set grok $env(QUOTABAR_GROK_BIN)
+    spawn -noecho $grok --no-subagents --no-auto-update agent stdio
+
+    send -- {{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":1,"clientCapabilities":{"fs":{"readTextFile":false,"writeTextFile":false},"terminal":false}}}}
+    send -- "\n"
+    expect -re {[^\r\n]*"id":0[^\r\n]*\r?\n}
+    expect -re {[^\r\n]*"id":0[^\r\n]*\r?\n}
+
+    send -- {{"jsonrpc":"2.0","id":1,"method":"authenticate","params":{"methodId":"cached_token","_meta":{"headless":true}}}}
+    send -- "\n"
+    expect -re {[^\r\n]*"id":1[^\r\n]*\r?\n}
+    expect -re {[^\r\n]*"id":1[^\r\n]*\r?\n}
+
+    send -- {{"jsonrpc":"2.0","id":2,"method":"_x.ai/billing","params":{}}}
+    send -- "\n"
+    expect -re {[^\r\n]*"id":2[^\r\n]*\r?\n}
+    expect -re {([^\r\n]*"id":2[^\r\n]*)\r?\n} {
+        puts $expect_out(1,string)
+    }
+    """#
 }

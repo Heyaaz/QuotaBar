@@ -4,26 +4,9 @@ import Security
 struct ClaudeProvider: UsageProvider {
     let id = ProviderID.claude
 
-    private let session: URLSession
-
-    init(session: URLSession = .shared) {
-        self.session = session
-    }
-
     func fetch() async throws -> ProviderSnapshot {
         let token = try Self.readAccessToken()
-        var request = URLRequest(url: URL(string: "https://api.anthropic.com/api/oauth/usage")!)
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
-        request.setValue("QuotaBar/0.1", forHTTPHeaderField: "User-Agent")
-
-        let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse else { throw ProviderError.invalidResponse }
-        if http.statusCode == 401 { throw ProviderError.notAuthenticated }
-        guard (200..<300).contains(http.statusCode) else {
-            throw ProviderError.processFailed("Claude usage request failed (HTTP \(http.statusCode)).")
-        }
-
+        let data = try await Self.requestUsage(accessToken: token)
         return try Self.parseUsage(data, fetchedAt: Date())
     }
 
@@ -78,5 +61,50 @@ struct ClaudeProvider: UsageProvider {
 
         return token
     }
-}
 
+    private static func requestUsage(accessToken: String) async throws -> Data {
+        try await Task.detached {
+            let process = Process()
+            let input = Pipe()
+            let output = Pipe()
+
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/curl")
+            process.arguments = [
+                "--silent",
+                "--show-error",
+                "--fail-with-body",
+                "--max-time", "10",
+                "--config", "-",
+                "https://api.anthropic.com/api/oauth/usage",
+            ]
+            process.standardInput = input
+            process.standardOutput = output
+            process.standardError = FileHandle.nullDevice
+
+            do {
+                try process.run()
+            } catch {
+                throw ProviderError.processFailed("Could not start the Claude usage request.")
+            }
+
+            let escapedToken = accessToken
+                .replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "\"", with: "\\\"")
+            let config = """
+            header = "Authorization: Bearer \(escapedToken)"
+            header = "anthropic-beta: oauth-2025-04-20"
+            header = "User-Agent: QuotaBar/0.1"
+
+            """
+            try input.fileHandleForWriting.write(contentsOf: Data(config.utf8))
+            try input.fileHandleForWriting.close()
+
+            let data = try output.fileHandleForReading.readToEnd() ?? Data()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else {
+                throw ProviderError.processFailed("Claude usage request failed.")
+            }
+            return data
+        }.value
+    }
+}

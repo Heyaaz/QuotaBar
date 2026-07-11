@@ -57,25 +57,29 @@ struct CodexProvider: UsageProvider {
 
     private static func readRateLimits(executable: String) async throws -> Data {
         try await Task.detached {
-            let client = try JSONLineProcess(executable: executable, arguments: ["app-server", "--stdio"])
-            defer { client.close() }
+            let process = Process()
+            let output = Pipe()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/expect")
+            process.arguments = ["-c", Self.expectScript]
+            process.environment = ProcessInfo.processInfo.environment.merging(
+                ["QUOTABAR_CODEX_BIN": executable],
+                uniquingKeysWith: { _, new in new }
+            )
+            process.standardOutput = output
+            process.standardError = FileHandle.nullDevice
 
-            let initialize: [String: Any] = [
-                "id": 0,
-                "method": "initialize",
-                "params": [
-                    "clientInfo": [
-                        "name": "quota_bar",
-                        "title": "QuotaBar",
-                        "version": "0.1.0",
-                    ],
-                ],
-            ]
-            try client.send(initialize)
-            _ = try client.read(id: 0)
-            try client.send(["method": "initialized"])
-            try client.send(["id": 1, "method": "account/rateLimits/read"])
-            return try client.read(id: 1)
+            do {
+                try process.run()
+            } catch {
+                throw ProviderError.processFailed("Could not start the Codex usage request.")
+            }
+
+            let data = try output.fileHandleForReading.readToEnd() ?? Data()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0, !data.isEmpty else {
+                throw ProviderError.processFailed("Codex usage request failed.")
+            }
+            return data
         }.value
     }
 
@@ -89,4 +93,27 @@ struct CodexProvider: UsageProvider {
 
         return candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
     }
+
+    private static let expectScript = #"""
+    log_user 0
+    set timeout 15
+    set codex $env(QUOTABAR_CODEX_BIN)
+    spawn -noecho $codex app-server --stdio
+
+    send -- {{"id":0,"method":"initialize","params":{"clientInfo":{"name":"quota_bar","title":"QuotaBar","version":"0.1.0"}}}}
+    send -- "\n"
+    expect -re {[^\r\n]*"id":0[^\r\n]*\r?\n}
+    expect -re {[^\r\n]*"id":0[^\r\n]*\r?\n}
+
+    send -- {{"method":"initialized"}}
+    send -- "\n"
+    expect -re {[^\r\n]*"method":"initialized"[^\r\n]*\r?\n}
+
+    send -- {{"id":1,"method":"account/rateLimits/read"}}
+    send -- "\n"
+    expect -re {[^\r\n]*"id":1[^\r\n]*\r?\n}
+    expect -re {([^\r\n]*"id":1[^\r\n]*)\r?\n} {
+        puts $expect_out(1,string)
+    }
+    """#
 }
