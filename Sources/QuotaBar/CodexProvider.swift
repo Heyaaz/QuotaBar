@@ -57,33 +57,8 @@ struct CodexProvider: UsageProvider {
 
     private static func readRateLimits(executable: String) async throws -> Data {
         try await Task.detached {
-            let process = Process()
-            let input = Pipe()
-            let output = Pipe()
-            let error = Pipe()
-
-            process.executableURL = URL(fileURLWithPath: executable)
-            process.arguments = ["app-server", "--stdio"]
-            process.standardInput = input
-            process.standardOutput = output
-            process.standardError = error
-
-            do {
-                try process.run()
-            } catch {
-                throw ProviderError.processFailed(error.localizedDescription)
-            }
-
-            let timeout = DispatchWorkItem {
-                if process.isRunning { process.terminate() }
-            }
-            DispatchQueue.global().asyncAfter(deadline: .now() + 10, execute: timeout)
-
-            defer {
-                timeout.cancel()
-                try? input.fileHandleForWriting.close()
-                if process.isRunning { process.terminate() }
-            }
+            let client = try JSONLineProcess(executable: executable, arguments: ["app-server", "--stdio"])
+            defer { client.close() }
 
             let initialize: [String: Any] = [
                 "id": 0,
@@ -96,23 +71,12 @@ struct CodexProvider: UsageProvider {
                     ],
                 ],
             ]
-            try writeJSON(initialize, to: input.fileHandleForWriting)
-
-            var reader = JSONLineReader(handle: output.fileHandleForReading)
-            guard try reader.readMessage(id: 0) != nil else { throw ProviderError.timedOut }
-
-            try writeJSON(["method": "initialized"], to: input.fileHandleForWriting)
-            try writeJSON(["id": 1, "method": "account/rateLimits/read"], to: input.fileHandleForWriting)
-
-            guard let response = try reader.readMessage(id: 1) else { throw ProviderError.timedOut }
-            return response
+            try client.send(initialize)
+            _ = try client.read(id: 0)
+            try client.send(["method": "initialized"])
+            try client.send(["id": 1, "method": "account/rateLimits/read"])
+            return try client.read(id: 1)
         }.value
-    }
-
-    private static func writeJSON(_ object: [String: Any], to handle: FileHandle) throws {
-        var data = try JSONSerialization.data(withJSONObject: object)
-        data.append(0x0A)
-        try handle.write(contentsOf: data)
     }
 
     private static func findExecutable() -> String? {
@@ -126,27 +90,3 @@ struct CodexProvider: UsageProvider {
         return candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
     }
 }
-
-private struct JSONLineReader {
-    let handle: FileHandle
-    var buffer = Data()
-
-    mutating func readMessage(id: Int) throws -> Data? {
-        while true {
-            while let newline = buffer.firstIndex(of: 0x0A) {
-                let line = buffer[..<newline]
-                buffer.removeSubrange(...newline)
-                guard
-                    let object = try JSONSerialization.jsonObject(with: line) as? [String: Any],
-                    object["id"] as? Int == id
-                else { continue }
-                return Data(line)
-            }
-
-            let chunk = handle.availableData
-            if chunk.isEmpty { return nil }
-            buffer.append(chunk)
-        }
-    }
-}
-
