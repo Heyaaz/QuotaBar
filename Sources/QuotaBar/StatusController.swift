@@ -7,10 +7,15 @@ final class StatusController: NSObject {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let popover = NSPopover()
     private let popoverController: UsagePopoverController
+    private var displayMode: MenuBarDisplayMode
 
     init(store: UsageStore) {
         self.store = store
-        self.popoverController = UsagePopoverController(store: store)
+        let displayMode = MenuBarDisplayMode(
+            rawValue: UserDefaults.standard.string(forKey: "menuBarDisplayMode") ?? ""
+        ) ?? .all
+        self.displayMode = displayMode
+        self.popoverController = UsagePopoverController(store: store, displayMode: displayMode)
         super.init()
 
         popover.behavior = .transient
@@ -26,6 +31,9 @@ final class StatusController: NSObject {
         }
 
         store.onChange = { [weak self] in self?.render() }
+        popoverController.onDisplayModeChange = { [weak self] mode in
+            self?.setDisplayMode(mode)
+        }
         render()
     }
 
@@ -47,17 +55,31 @@ final class StatusController: NSObject {
             .foregroundColor: NSColor.controlTextColor,
         ]
         let title = NSMutableAttributedString()
+        let entries: [(ProviderID, String)]
 
-        for (index, id) in ProviderID.allCases.enumerated() {
+        switch displayMode {
+        case .all:
+            entries = ProviderID.allCases.map { ($0, usageText(for: $0)) }
+        case .lowest:
+            guard let lowest = Self.lowestQuota(in: store.states) else {
+                return NSAttributedString(string: "…", attributes: attributes)
+            }
+            entries = [(
+                lowest.provider,
+                "\(lowest.window.shortLabel) \(lowest.window.remainingPercent)%"
+            )]
+        }
+
+        for (index, entry) in entries.enumerated() {
             if index > 0 {
                 title.append(NSAttributedString(string: "  │  ", attributes: attributes))
             }
 
             let attachment = NSTextAttachment()
-            attachment.image = ProviderIcons.image(for: id)
+            attachment.image = ProviderIcons.image(for: entry.0)
             attachment.bounds = NSRect(x: 0, y: -2, width: 13, height: 13)
             title.append(NSAttributedString(attachment: attachment))
-            title.append(NSAttributedString(string: " \(usageText(for: id))", attributes: attributes))
+            title.append(NSAttributedString(string: " \(entry.1)", attributes: attributes))
         }
 
         return title
@@ -80,6 +102,28 @@ final class StatusController: NSObject {
         return "\(id.rawValue) \(usageText(for: id))\(state.isStale ? ", cached" : "")"
     }
 
+    static func lowestQuota(
+        in states: [ProviderID: ProviderState]
+    ) -> (provider: ProviderID, window: QuotaWindow)? {
+        var lowest: (provider: ProviderID, window: QuotaWindow)?
+        for provider in ProviderID.allCases {
+            for window in states[provider]?.snapshot?.windows ?? [] {
+                if lowest == nil || window.remainingPercent < lowest!.window.remainingPercent {
+                    lowest = (provider, window)
+                }
+            }
+        }
+        return lowest
+    }
+
+    private func setDisplayMode(_ mode: MenuBarDisplayMode) {
+        guard displayMode != mode else { return }
+        displayMode = mode
+        UserDefaults.standard.set(mode.rawValue, forKey: "menuBarDisplayMode")
+        popoverController.displayMode = mode
+        render()
+    }
+
     @objc private func togglePopover() {
         guard let button = statusItem.button else { return }
         if popover.isShown {
@@ -98,9 +142,12 @@ private final class UsagePopoverController: NSViewController {
     private let refreshButton = NSButton()
     private let settingsButton = NSButton()
     private let spinner = NSProgressIndicator()
+    var displayMode: MenuBarDisplayMode
+    var onDisplayModeChange: ((MenuBarDisplayMode) -> Void)?
 
-    init(store: UsageStore) {
+    init(store: UsageStore, displayMode: MenuBarDisplayMode) {
         self.store = store
+        self.displayMode = displayMode
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -283,6 +330,23 @@ private final class UsagePopoverController: NSViewController {
 
         let menu = NSMenu()
         menu.addItem(launchAtLogin)
+        menu.addItem(.separator())
+
+        for (title, mode) in [
+            ("Show All Providers", MenuBarDisplayMode.all),
+            ("Show Lowest Only", MenuBarDisplayMode.lowest),
+        ] {
+            let item = NSMenuItem(
+                title: title,
+                action: #selector(selectDisplayMode(_:)),
+                keyEquivalent: ""
+            )
+            item.target = self
+            item.representedObject = mode.rawValue
+            item.state = displayMode == mode ? .on : .off
+            menu.addItem(item)
+        }
+
         menu.popUp(
             positioning: nil,
             at: NSPoint(x: 0, y: settingsButton.bounds.maxY),
@@ -304,6 +368,16 @@ private final class UsagePopoverController: NSViewController {
         } catch {
             NSAlert(error: error).runModal()
         }
+    }
+
+    @objc private func selectDisplayMode(_ sender: NSMenuItem) {
+        guard
+            let rawValue = sender.representedObject as? String,
+            let mode = MenuBarDisplayMode(rawValue: rawValue)
+        else { return }
+
+        displayMode = mode
+        onDisplayModeChange?(mode)
     }
 
     private static let resetFormatter: DateFormatter = {

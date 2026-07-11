@@ -144,3 +144,24 @@ func alertsOnlyWhenQuotaCrossesAThreshold() {
     #expect(QuotaAlert.crossings(from: previous, to: current).map(\.threshold) == [20, 5])
     #expect(QuotaAlert.crossings(from: current, to: current).isEmpty)
 }
+
+@Test @MainActor
+func selectsTheLowestRemainingQuotaForCompactDisplay() {
+    let states: [ProviderID: ProviderState] = [
+        .claude: ProviderState(snapshot: ProviderSnapshot(
+            provider: .claude,
+            windows: [QuotaWindow(durationMinutes: 300, remainingPercent: 40, resetsAt: nil)],
+            fetchedAt: .distantPast
+        )),
+        .codex: ProviderState(snapshot: ProviderSnapshot(
+            provider: .codex,
+            windows: [QuotaWindow(durationMinutes: 10_080, remainingPercent: 12, resetsAt: nil)],
+            fetchedAt: .distantPast
+        )),
+    ]
+
+    let lowest = StatusController.lowestQuota(in: states)
+    #expect(lowest?.provider == .codex)
+    #expect(lowest?.window.shortLabel == "W")
+    #expect(lowest?.window.remainingPercent == 12)
+}

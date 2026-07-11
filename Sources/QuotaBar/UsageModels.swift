@@ -6,6 +6,11 @@ enum ProviderID: String, Codable, CaseIterable, Sendable {
     case grok = "Grok"
 }
 
+enum MenuBarDisplayMode: String, Sendable {
+    case all
+    case lowest
+}
+
 struct QuotaWindow: Codable, Equatable, Sendable {
     let durationMinutes: Int?
     let remainingPercent: Int
