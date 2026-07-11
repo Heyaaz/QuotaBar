@@ -29,33 +29,54 @@ final class StatusController: NSObject {
     }
 
     private func render() {
-        let text = ProviderID.allCases.map(statusText).joined(separator: "  │  ")
         statusItem.length = NSStatusItem.variableLength
-        statusItem.button?.attributedTitle = NSAttributedString(
-            string: text,
-            attributes: [
-                .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium),
-                .foregroundColor: NSColor.controlTextColor,
-            ]
+        statusItem.button?.attributedTitle = statusTitle()
+        statusItem.button?.setAccessibilityLabel(
+            ProviderID.allCases.map(accessibilityText).joined(separator: ", ")
         )
-        statusItem.button?.toolTip = "AI subscription usage — click for details"
+        statusItem.button?.toolTip = store.states.values.contains(where: \.isStale)
+            ? "Some values are cached — click for details"
+            : "AI subscription usage — click for details"
         popoverController.render()
     }
 
-    private func statusText(for id: ProviderID) -> String {
-        let name = switch id {
-        case .claude: "C"
-        case .codex: "GPT"
-        case .grok: "X"
-        }
-        guard let state = store.states[id], let snapshot = state.snapshot else {
-            return "\(name) —"
+    private func statusTitle() -> NSAttributedString {
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium),
+            .foregroundColor: NSColor.controlTextColor,
+        ]
+        let title = NSMutableAttributedString()
+
+        for (index, id) in ProviderID.allCases.enumerated() {
+            if index > 0 {
+                title.append(NSAttributedString(string: "  │  ", attributes: attributes))
+            }
+
+            let attachment = NSTextAttachment()
+            attachment.image = ProviderIcons.image(for: id)
+            attachment.bounds = NSRect(x: 0, y: -2, width: 13, height: 13)
+            title.append(NSAttributedString(attachment: attachment))
+            title.append(NSAttributedString(string: " \(usageText(for: id))", attributes: attributes))
         }
 
-        let values = snapshot.windows
+        return title
+    }
+
+    private func usageText(for id: ProviderID) -> String {
+        guard let state = store.states[id], let snapshot = state.snapshot else {
+            return "—"
+        }
+
+        return snapshot.windows
             .map { "\($0.shortLabel) \($0.remainingPercent)%" }
             .joined(separator: " · ")
-        return "\(name) \(values)\(state.isStale ? " ~" : "")"
+    }
+
+    private func accessibilityText(for id: ProviderID) -> String {
+        guard let state = store.states[id], state.snapshot != nil else {
+            return "\(id.rawValue) unavailable"
+        }
+        return "\(id.rawValue) \(usageText(for: id))\(state.isStale ? ", cached" : "")"
     }
 
     @objc private func togglePopover() {

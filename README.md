@@ -2,7 +2,7 @@
 
 QuotaBar is a small, read-only macOS menu bar app that shows the remaining subscription quota exposed by Claude Code, Codex CLI, and Grok Build.
 
-The menu bar shows all three providers at once. Each provider displays only the windows it actually returns, such as `5h` and `W`; missing windows are never estimated.
+The menu bar shows all three providers at once, identified by their logos. Each provider displays only the windows it actually returns, such as `5h` and `W`; missing windows are never estimated. If a refresh fails, the last successful value remains visible and the details popover marks it as stale.
 
 ## Requirements
 
@@ -29,7 +29,7 @@ swift test
 QUOTABAR_LIVE_TESTS=1 swift test
 ```
 
-Live tests require all three clients to be signed in. The packaged app measured 40,512 KB RSS after refreshing all providers, with no persistent child process, on the development Mac.
+Live tests require all three clients to be signed in. The packaged app measured 42,480 KB RSS after refreshing all providers, with no persistent child process, on the development Mac.
 
 ## Privacy
 
@@ -38,3 +38,5 @@ Live tests require all three clients to be signed in. The packaged app measured 
 - Claude usage is read with the Claude Code Keychain credential.
 - Codex and Grok usage are read through their official local client protocols.
 - No browser automation, embedded browser, analytics, or usage history is included.
+
+Claude, OpenAI, and xAI logos are trademarks of their respective owners and are used only to identify the corresponding service.

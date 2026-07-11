@@ -110,3 +110,13 @@ func omitsUnavailableCodexWindow() throws {
     #expect(snapshot.windows.count == 1)
     #expect(snapshot.windows[0].remainingPercent == 90)
 }
+
+@Test @MainActor
+func decodesCompactMenuBarLogos() {
+    for provider in ProviderID.allCases {
+        let image = ProviderIcons.image(for: provider)
+        #expect(image.isTemplate)
+        #expect(image.size.width == 13)
+        #expect(image.size.height == 13)
+    }
+}
