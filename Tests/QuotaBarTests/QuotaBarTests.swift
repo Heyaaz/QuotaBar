@@ -90,3 +90,23 @@ private struct StubProvider: UsageProvider {
         try result.get()
     }
 }
+
+@Test
+func formatsProviderNativeWindowLabels() {
+    let windows = [
+        QuotaWindow(durationMinutes: 300, remainingPercent: 1, resetsAt: nil),
+        QuotaWindow(durationMinutes: 1_440, remainingPercent: 1, resetsAt: nil),
+        QuotaWindow(durationMinutes: 10_080, remainingPercent: 1, resetsAt: nil),
+    ]
+
+    #expect(windows.map(\.shortLabel) == ["5h", "1d", "W"])
+}
+
+@Test
+func omitsUnavailableCodexWindow() throws {
+    let json = #"{"id":1,"result":{"rateLimits":{"primary":{"usedPercent":10,"windowDurationMins":300,"resetsAt":1000},"secondary":null}}}"#
+    let snapshot = try CodexProvider.parseRateLimits(Data(json.utf8), fetchedAt: .distantPast)
+
+    #expect(snapshot.windows.count == 1)
+    #expect(snapshot.windows[0].remainingPercent == 90)
+}
