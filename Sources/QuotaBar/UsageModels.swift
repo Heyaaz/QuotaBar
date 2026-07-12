@@ -30,6 +30,17 @@ struct ProviderSnapshot: Codable, Equatable, Sendable {
     let provider: ProviderID
     let windows: [QuotaWindow]
     let fetchedAt: Date
+
+    func usableCache(at now: Date, maxAge: TimeInterval = 600) -> ProviderSnapshot? {
+        guard now.timeIntervalSince(fetchedAt) <= maxAge else { return nil }
+
+        let validWindows = windows.filter { window in
+            window.resetsAt.map { $0 > now } ?? true
+        }
+        guard !validWindows.isEmpty else { return nil }
+
+        return ProviderSnapshot(provider: provider, windows: validWindows, fetchedAt: fetchedAt)
+    }
 }
 
 enum ProviderError: LocalizedError, Equatable, Sendable {

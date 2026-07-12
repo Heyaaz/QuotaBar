@@ -92,6 +92,27 @@ func keepsSuccessfulProvidersWhenAnotherFails() async {
     #expect(store.states[.claude]?.errorMessage == nil)
 }
 
+@Test
+func rejectsOldCachedUsageAndExpiredWindows() {
+    let now = Date(timeIntervalSince1970: 10_000)
+    let old = ProviderSnapshot(
+        provider: .claude,
+        windows: [QuotaWindow(durationMinutes: 300, remainingPercent: 96, resetsAt: nil)],
+        fetchedAt: now.addingTimeInterval(-601)
+    )
+    let partlyExpired = ProviderSnapshot(
+        provider: .claude,
+        windows: [
+            QuotaWindow(durationMinutes: 300, remainingPercent: 96, resetsAt: now),
+            QuotaWindow(durationMinutes: 10_080, remainingPercent: 82, resetsAt: now.addingTimeInterval(60)),
+        ],
+        fetchedAt: now.addingTimeInterval(-60)
+    )
+
+    #expect(old.usableCache(at: now) == nil)
+    #expect(partlyExpired.usableCache(at: now)?.windows.map(\.shortLabel) == ["W"])
+}
+
 private struct StubProvider: UsageProvider {
     let id: ProviderID
     let result: Result<ProviderSnapshot, ProviderError>

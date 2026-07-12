@@ -75,6 +75,7 @@ final class UsageStore: NSObject {
                 onSnapshotUpdate?(previous, snapshot)
             case .failure(let error):
                 var state = states[id, default: ProviderState()]
+                state.snapshot = state.snapshot?.usableCache(at: Date())
                 state.errorMessage = error.localizedDescription
                 state.isRefreshing = false
                 state.isStale = state.snapshot != nil
@@ -97,7 +98,9 @@ final class UsageStore: NSObject {
             let snapshots = try? JSONDecoder.quotaBar.decode([ProviderSnapshot].self, from: data)
         else { return }
 
-        for snapshot in snapshots {
+        let now = Date()
+        for cachedSnapshot in snapshots {
+            guard let snapshot = cachedSnapshot.usableCache(at: now) else { continue }
             states[snapshot.provider] = ProviderState(snapshot: snapshot, isStale: true)
         }
         onChange?()
