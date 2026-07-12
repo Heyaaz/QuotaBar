@@ -61,10 +61,7 @@ struct CodexProvider: UsageProvider {
             let output = Pipe()
             process.executableURL = URL(fileURLWithPath: "/usr/bin/expect")
             process.arguments = ["-c", Self.expectScript]
-            process.environment = ProcessInfo.processInfo.environment.merging(
-                ["QUOTABAR_CODEX_BIN": executable],
-                uniquingKeysWith: { _, new in new }
-            )
+            process.environment = Self.processEnvironment(executable: executable)
             process.standardOutput = output
             process.standardError = FileHandle.nullDevice
 
@@ -81,6 +78,24 @@ struct CodexProvider: UsageProvider {
             }
             return data
         }.value
+    }
+
+    static func processEnvironment(executable: String) -> [String: String] {
+        let environment = ProcessInfo.processInfo.environment
+        let executableDirectory = URL(fileURLWithPath: executable)
+            .deletingLastPathComponent()
+            .path
+        let path = [
+            executableDirectory,
+            "/opt/homebrew/bin",
+            "/usr/local/bin",
+            environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin",
+        ].joined(separator: ":")
+
+        return environment.merging(
+            ["QUOTABAR_CODEX_BIN": executable, "PATH": path],
+            uniquingKeysWith: { _, new in new }
+        )
     }
 
     private static func findExecutable() -> String? {

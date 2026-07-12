@@ -21,6 +21,16 @@ func readsCodexRateLimitsWhenLiveTestsAreEnabled() async throws {
 }
 
 @Test
+func addsHomebrewToolsToCodexProcessPath() {
+    let environment = CodexProvider.processEnvironment(executable: "/opt/homebrew/bin/codex")
+    let path = environment["PATH"]?.split(separator: ":")
+
+    #expect(environment["QUOTABAR_CODEX_BIN"] == "/opt/homebrew/bin/codex")
+    #expect(path?.contains("/opt/homebrew/bin") == true)
+    #expect(path?.contains("/usr/local/bin") == true)
+}
+
+@Test
 func parsesClaudeWindows() throws {
     let json = #"{"five_hour":{"utilization":3.0,"resets_at":"2026-07-11T19:40:00.296175+00:00"},"seven_day":{"utilization":18.0,"resets_at":"2026-07-17T13:00:00.296197+00:00"}}"#
     let snapshot = try ClaudeProvider.parseUsage(Data(json.utf8), fetchedAt: .distantPast)
