@@ -50,6 +50,24 @@ func readsClaudeUsageWhenLiveTestsAreEnabled() async throws {
 }
 
 @Test
+func preparesCleanClaudeCLIEnvironment() {
+    let environment = ClaudeProvider.processEnvironment(
+        executable: "/opt/homebrew/bin/claude",
+        baseEnvironment: [
+            "ANTHROPIC_API_KEY": "secret",
+            "CLAUDE_CODE_OAUTH_TOKEN": "stale",
+            "PATH": "/usr/bin:/bin",
+        ]
+    )
+    let path = environment["PATH"]?.split(separator: ":")
+
+    #expect(environment["QUOTABAR_CLAUDE_BIN"] == "/opt/homebrew/bin/claude")
+    #expect(environment["ANTHROPIC_API_KEY"] == nil)
+    #expect(environment["CLAUDE_CODE_OAUTH_TOKEN"] == nil)
+    #expect(path?.contains("/opt/homebrew/bin") == true)
+}
+
+@Test
 func parsesGrokWeeklyWindow() throws {
     let json = #"{"jsonrpc":"2.0","id":2,"result":{"config":{"creditUsagePercent":21.5,"currentPeriod":{"type":"USAGE_PERIOD_TYPE_WEEKLY","end":"2026-07-18T14:35:45.502164+00:00"}}}}"#
     let snapshot = try GrokProvider.parseBilling(Data(json.utf8), fetchedAt: .distantPast)
