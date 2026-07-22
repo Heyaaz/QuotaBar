@@ -12,7 +12,7 @@ final class UsageStore: NSObject {
     var onSnapshotUpdate: ((ProviderSnapshot?, ProviderSnapshot) -> Void)?
 
     init(
-        providers: [any UsageProvider] = [ClaudeProvider(), CodexProvider(), GrokProvider()],
+        providers: [any UsageProvider] = [ClaudeProvider(), CodexProvider(), GrokProvider(), KimiProvider()],
         cacheURL: URL = UsageStore.defaultCacheURL
     ) {
         self.providers = providers

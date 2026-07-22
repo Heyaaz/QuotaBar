@@ -86,6 +86,25 @@ func readsGrokUsageWhenLiveTestsAreEnabled() async throws {
     #expect(snapshot.windows.count == 1)
 }
 
+@Test
+func parsesKimiWindows() throws {
+    let json = #"{"usage":{"limit":"100","used":"1","remaining":"99","resetTime":"2026-07-29T00:53:55.769566Z"},"limits":[{"window":{"duration":300,"timeUnit":"TIME_UNIT_MINUTE"},"detail":{"limit":"100","used":"7","remaining":"93","resetTime":"2026-07-22T05:53:55.769566Z"}}]}"#
+    let snapshot = try KimiProvider.parseUsage(Data(json.utf8), fetchedAt: .distantPast)
+
+    #expect(snapshot.provider == .kimi)
+    #expect(snapshot.windows.map(\.shortLabel) == ["5h", "W"])
+    #expect(snapshot.windows.map(\.remainingPercent) == [93, 99])
+    #expect(snapshot.windows.allSatisfy { $0.resetsAt != nil })
+}
+
+@Test
+func readsKimiUsageWhenLiveTestsAreEnabled() async throws {
+    guard ProcessInfo.processInfo.environment["QUOTABAR_LIVE_TESTS"] == "1" else { return }
+
+    let snapshot = try await KimiProvider().fetch()
+    #expect(!snapshot.windows.isEmpty)
+}
+
 @Test @MainActor
 func keepsSuccessfulProvidersWhenAnotherFails() async {
     let now = Date()

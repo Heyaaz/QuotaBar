@@ -27,7 +27,7 @@ final class StatusController: NSObject {
             button.action = #selector(togglePopover)
             button.sendAction(on: [.leftMouseUp])
             button.setAccessibilityLabel("AI subscription usage")
-            button.setAccessibilityHelp("Shows remaining Claude, Codex, and Grok usage")
+            button.setAccessibilityHelp("Shows remaining Claude, Codex, Grok, and Kimi usage")
         }
 
         store.onChange = { [weak self] in self?.render() }

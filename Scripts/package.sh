@@ -17,7 +17,9 @@ BIN_DIR=$(/usr/bin/swift build --package-path "$ROOT" -c release --show-bin-path
 /bin/cp "$BIN_DIR/QuotaBar" "$APP/Contents/MacOS/QuotaBar"
 /bin/cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
 /usr/bin/xattr -cr "$APP"
-/usr/bin/codesign --force --sign - --timestamp=none "$APP"
+# Sign with a stable identity so Keychain's "Always Allow" survives rebuilds.
+# Ad-hoc signing (-) changes the code hash every build, which re-triggers prompts.
+/usr/bin/codesign --force --sign "Apple Development" --timestamp=none "$APP"
 /usr/bin/codesign --verify --deep --strict "$APP"
 /usr/bin/ditto -c -k --keepParent "$APP" "$ZIP"
 

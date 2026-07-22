@@ -4,6 +4,7 @@ enum ProviderID: String, Codable, CaseIterable, Sendable {
     case claude = "Claude"
     case codex = "Codex"
     case grok = "Grok"
+    case kimi = "Kimi"
 }
 
 enum MenuBarDisplayMode: String, Sendable {

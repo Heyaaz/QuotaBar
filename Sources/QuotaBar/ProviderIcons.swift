@@ -8,6 +8,7 @@ enum ProviderIcons {
         case .claude: claude
         case .codex: codex
         case .grok: grok
+        case .kimi: kimi
         }
     }
 
@@ -68,6 +69,19 @@ enum ProviderIcons {
         Zx25FqBvRwMUkpV4a/e2g8MFovX66WNksR0FYlPXVWjDySRdtFNTi1/ZgfkFWPIe9In+kHzrgWSSk7S1iYvardAJO0GvYQxN
         UALVAkus9j7EUFimE6GyesSJ1H+52+AmUJXTXzD3qsyuyhdDYdErpw/R3kykdnsOhsCS5LWD2A/CeKgoNRkPHfE+0B12Z2zW
         jVFaYT3MhnpQkRmAG3Ad3EJGN0yUfBc0h7n/WS/VaP0B0b/XqoiqW6WyWpWF/ftJfwAl17VRnFdZUgAAAABJRU5ErkJggg==
+        """
+    )
+
+    private static let kimi = tintedMask(
+        """
+        iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAERlWElmTU0AKgAAAAgAAYdpAAQAAAAB
+        AAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAIKADAAQAAAABAAAAIAAAAACshmLzAAABpklEQVRYCe2Ur0sEQRTH
+        d/3RFETlwKD1ugg2myAYbLfFYtJ8QYwGi4rJICaLGIwmmwb/BMFgEJOIXvEUBPXWz3Ds7szcu71zdsEyA4993++8/X7fvP0R
+        BH75CfgJ/PMEwjz/OI4X2T+zah7DMJzTOeoGwBfEvM6TfxFV6psWn8KhNJOTcehJectgt0HLBtMG+3nmQr1JcbKIsNeLXsXm
+        EtGyi8DXxKBeK+VqdM4LgxluPiXsR/kEF3H6n17izg1gPoz4OTFhmXyDa5g/W7wInRtA7YCwXzplson5jUoKL04pvgPwNUJa
+        aiLlLRykBpTxm+B+BzfyV3fXRzAqGG0x+neBz6VcG5BE60zA/hqkOoMrs4EFlDcM9T5AmQ0ou12mMN2Hb1ri2sADCpepSpao
+        d+M4gwUzTtPtK5hlr0I0CGmtFrRu346y1EAjEWd/TXKHeyUqSV3e1eURtBJBPrsT8qsEa1f1ez7UcNfUpQFbbB3i0ybB6m+5
+        IvAGVbgBpnCP4o6hmoEjmhjLYGfWq4GPzlsC6W+3R92tUDsFFwm8p/wE/ATSCfwC52k/HCfCVwcAAAAASUVORK5CYII=
         """
     )
 
