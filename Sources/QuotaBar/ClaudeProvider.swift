@@ -5,10 +5,12 @@ struct ClaudeProvider: UsageProvider {
     let id = ProviderID.claude
 
     func fetch() async throws -> ProviderSnapshot {
-        var credentials = try Self.readCredentials()
+        var credentials = try Self.currentCredentials()
         var didRefresh = false
+
         if credentials.needsRefresh(at: Date()) {
             credentials = try await Self.refreshCredentials(from: credentials)
+            Self.setCachedCredentials(credentials)
             didRefresh = true
         }
 
@@ -22,7 +24,9 @@ struct ClaudeProvider: UsageProvider {
                 return try Self.parseUsage(data, fetchedAt: Date())
             } catch ClaudeRequestError.unauthorized {
                 guard !didRefresh else { throw Self.authenticationError }
+                Self.setCachedCredentials(nil)
                 credentials = try await Self.refreshCredentials(from: credentials)
+                Self.setCachedCredentials(credentials)
                 didRefresh = true
             } catch ClaudeRequestError.rateLimited {
                 throw ProviderError.processFailed("Claude is rate limited. Try again shortly.")
@@ -60,6 +64,32 @@ struct ClaudeProvider: UsageProvider {
 
         guard !windows.isEmpty else { throw ProviderError.invalidResponse }
         return ProviderSnapshot(provider: .claude, windows: windows, fetchedAt: fetchedAt)
+    }
+
+    // In-memory credential cache. Avoids hitting the Keychain (and its
+    // authorization prompt) on every 5-minute refresh while the access token
+    // is still valid. The cache is invalidated on expiry or 401.
+    private static let cacheLock = NSLock()
+    nonisolated(unsafe) private static var cachedCredentialsValue: Credentials?
+
+    private static func currentCredentials() throws -> Credentials {
+        cacheLock.lock()
+        let cached = cachedCredentialsValue
+        cacheLock.unlock()
+
+        if let cached {
+            return cached
+        }
+
+        let fresh = try readCredentials()
+        setCachedCredentials(fresh)
+        return fresh
+    }
+
+    private static func setCachedCredentials(_ credentials: Credentials?) {
+        cacheLock.lock()
+        cachedCredentialsValue = credentials
+        cacheLock.unlock()
     }
 
     private static func readCredentials() throws -> Credentials {
