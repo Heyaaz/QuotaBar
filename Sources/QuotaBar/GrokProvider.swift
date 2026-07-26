@@ -98,18 +98,15 @@ struct GrokProvider: UsageProvider {
 
     send -- {{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":1,"clientCapabilities":{"fs":{"readTextFile":false,"writeTextFile":false},"terminal":false}}}}
     send -- "\n"
-    expect -re {[^\r\n]*"id":0[^\r\n]*\r?\n}
-    expect -re {[^\r\n]*"id":0[^\r\n]*\r?\n}
+    expect -re {[^\r\n]*"id":0,"(?:result|error)"[^\r\n]*\r?\n}
 
     send -- {{"jsonrpc":"2.0","id":1,"method":"authenticate","params":{"methodId":"cached_token","_meta":{"headless":true}}}}
     send -- "\n"
-    expect -re {[^\r\n]*"id":1[^\r\n]*\r?\n}
-    expect -re {[^\r\n]*"id":1[^\r\n]*\r?\n}
+    expect -re {[^\r\n]*"id":1,"(?:result|error)"[^\r\n]*\r?\n}
 
     send -- {{"jsonrpc":"2.0","id":2,"method":"_x.ai/billing","params":{}}}
     send -- "\n"
-    expect -re {[^\r\n]*"id":2[^\r\n]*\r?\n}
-    expect -re {([^\r\n]*"id":2[^\r\n]*)\r?\n} {
+    expect -re {([^\r\n]*"id":2,"(?:result|error)"[^\r\n]*)\r?\n} {
         puts $expect_out(1,string)
     }
     """#

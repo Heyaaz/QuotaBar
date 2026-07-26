@@ -79,6 +79,17 @@ func parsesGrokWeeklyWindow() throws {
 }
 
 @Test
+func parsesGrokBillingWithoutUsageFields() throws {
+    let json = #"{"jsonrpc":"2.0","id":2,"result":{"config":{"currentPeriod":{"type":"USAGE_PERIOD_TYPE_WEEKLY","start":"2026-07-25T14:35:45.502164+00:00","end":"2026-08-01T14:35:45.502164+00:00"},"onDemandCap":{"val":0},"onDemandUsed":{"val":0},"prepaidBalance":{"val":0},"isUnifiedBillingUser":true,"billingPeriodStart":"2026-07-25T14:35:45.502164+00:00","billingPeriodEnd":"2026-08-01T14:35:45.502164+00:00"},"subscription_tier":"SuperGrok"}}"#
+    let snapshot = try GrokProvider.parseBilling(Data(json.utf8), fetchedAt: .distantPast)
+
+    #expect(snapshot.provider == .grok)
+    #expect(snapshot.windows.map(\.shortLabel) == ["W"])
+    #expect(snapshot.windows.map(\.remainingPercent) == [100])
+    #expect(snapshot.windows[0].resetsAt != nil)
+}
+
+@Test
 func readsGrokUsageWhenLiveTestsAreEnabled() async throws {
     guard ProcessInfo.processInfo.environment["QUOTABAR_LIVE_TESTS"] == "1" else { return }
 
