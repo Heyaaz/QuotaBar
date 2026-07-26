@@ -11,7 +11,6 @@ trap '/bin/rm -rf "$STAGE"' EXIT
 BIN_DIR=$(/usr/bin/swift build --package-path "$ROOT" -c release --show-bin-path)
 
 /bin/mkdir -p "$ROOT/outputs"
-/bin/rm -rf "$ROOT/outputs/QuotaBar.app"
 /bin/rm -f "$ZIP"
 /bin/mkdir -p "$APP/Contents/MacOS"
 /bin/cp "$BIN_DIR/QuotaBar" "$APP/Contents/MacOS/QuotaBar"
