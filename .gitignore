@@ -1,6 +1,7 @@
 .build/
 .DS_Store
 .interview/
+.gjc/
 work/
 outputs/
 QuotaBar.app/

@@ -1,5 +1,4 @@
 import Foundation
-import Security
 
 struct ClaudeProvider: UsageProvider {
     let id = ProviderID.claude
@@ -92,19 +91,37 @@ struct ClaudeProvider: UsageProvider {
         cacheLock.unlock()
     }
 
+    // Read through /usr/bin/security instead of SecItemCopyMatching.
+    //
+    // Claude Code writes this item with `security add-generic-password`, which
+    // resets the item's Keychain partition list to ("apple-tool:") on every
+    // OAuth refresh. An in-process read from QuotaBar (teamid B3SGJNFW7N) then
+    // fails the partition check and macOS shows the "Always Allow" prompt again
+    // on every token refresh, forever. /usr/bin/security is Apple-signed, so it
+    // always satisfies the apple-tool: partition and never prompts.
     private static func readCredentials() throws -> Credentials {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: "Claude Code-credentials",
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
+        let process = Process()
+        let output = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
+        process.arguments = [
+            "find-generic-password",
+            "-s", "Claude Code-credentials",
+            "-w",
         ]
-        var result: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        process.standardOutput = output
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+        } catch {
+            throw authenticationError
+        }
+
+        let data = (try? output.fileHandleForReading.readToEnd()) ?? Data()
+        process.waitUntilExit()
 
         guard
-            status == errSecSuccess,
-            let data = result as? Data,
+            process.terminationStatus == 0,
             let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
             let oauth = root["claudeAiOauth"] as? [String: Any]
         else { throw authenticationError }
