@@ -16,8 +16,24 @@ struct QuotaWindow: Codable, Equatable, Sendable {
     let durationMinutes: Int?
     let remainingPercent: Int
     let resetsAt: Date?
+    // Overrides the bucket-derived label (e.g. "5h", "W") for custom windows
+    // such as codex-lb accounts.
+    let label: String?
+
+    init(
+        durationMinutes: Int?,
+        remainingPercent: Int,
+        resetsAt: Date?,
+        label: String? = nil
+    ) {
+        self.durationMinutes = durationMinutes
+        self.remainingPercent = remainingPercent
+        self.resetsAt = resetsAt
+        self.label = label
+    }
 
     var shortLabel: String {
+        if let label { return label }
         guard let durationMinutes else { return "W" }
         if durationMinutes == 300 { return "5h" }
         if durationMinutes % 10_080 == 0 { return "W" }

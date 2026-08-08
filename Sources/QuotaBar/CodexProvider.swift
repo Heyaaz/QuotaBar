@@ -11,10 +11,45 @@ struct CodexProvider: UsageProvider {
 
     func fetch() async throws -> ProviderSnapshot {
         let path = executable ?? Self.findExecutable()
-        guard let path else { throw ProviderError.executableNotFound("Codex CLI") }
 
-        let response = try await Self.readRateLimits(executable: path)
-        return try Self.parseRateLimits(response, fetchedAt: Date())
+        // Codex CLI quota (5h/W) plus, when a local codex-lb is running, one
+        // window per routed account. The popover lists all windows under
+        // Codex; account windows carry a label and never render in the menu bar.
+        async let cli: Result<ProviderSnapshot, ProviderError> = Self.attempt {
+            guard let path else { throw ProviderError.executableNotFound("Codex CLI") }
+            let response = try await Self.readRateLimits(executable: path)
+            return try Self.parseRateLimits(response, fetchedAt: Date())
+        }
+        async let lb: Result<ProviderSnapshot, ProviderError> = Self.attempt {
+            try await CodexLBProvider().fetch()
+        }
+
+        let cliResult = await cli
+        let lbResult = await lb
+
+        var windows = (try? cliResult.get())?.windows ?? []
+        windows += (try? lbResult.get())?.windows ?? []
+
+        guard !windows.isEmpty else {
+            switch cliResult {
+            case .failure(let error): throw error
+            case .success: throw ProviderError.invalidResponse
+            }
+        }
+
+        return ProviderSnapshot(provider: .codex, windows: windows, fetchedAt: Date())
+    }
+
+    private static func attempt(
+        _ body: () async throws -> ProviderSnapshot
+    ) async -> Result<ProviderSnapshot, ProviderError> {
+        do {
+            return .success(try await body())
+        } catch let error as ProviderError {
+            return .failure(error)
+        } catch {
+            return .failure(.processFailed(error.localizedDescription))
+        }
     }
 
     static func parseRateLimits(_ data: Data, fetchedAt: Date) throws -> ProviderSnapshot {

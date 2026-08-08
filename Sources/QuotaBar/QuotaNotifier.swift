@@ -14,7 +14,7 @@ struct QuotaAlert: Equatable, Sendable {
 
         return current.windows.compactMap { window in
             guard let oldWindow = previous.windows.first(where: {
-                $0.durationMinutes == window.durationMinutes
+                $0.durationMinutes == window.durationMinutes && $0.label == window.label
             }) else { return nil }
 
             if oldWindow.resetsAt != nil || window.resetsAt != nil {

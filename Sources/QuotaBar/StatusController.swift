@@ -90,7 +90,11 @@ final class StatusController: NSObject {
             return "—"
         }
 
-        return snapshot.windows
+        // Account windows (codex-lb) are labeled and only shown in the popover.
+        let visible = snapshot.windows.filter { $0.label == nil }
+        guard !visible.isEmpty else { return "—" }
+
+        return visible
             .map { "\($0.shortLabel) \($0.remainingPercent)%" }
             .joined(separator: " · ")
     }
@@ -108,6 +112,8 @@ final class StatusController: NSObject {
         var lowest: (provider: ProviderID, window: QuotaWindow)?
         for provider in ProviderID.allCases {
             for window in states[provider]?.snapshot?.windows ?? [] {
+                // Labeled account windows (codex-lb) stay out of the menu bar.
+                guard window.label == nil else { continue }
                 if lowest == nil || window.remainingPercent < lowest!.window.remainingPercent {
                     lowest = (provider, window)
                 }
@@ -255,13 +261,21 @@ private final class UsagePopoverController: NSViewController {
     private func makeWindowRow(_ window: QuotaWindow) -> NSView {
         let label = text(window.shortLabel, size: 11, weight: .medium)
         label.font = .monospacedDigitSystemFont(ofSize: 11, weight: .medium)
-        label.widthAnchor.constraint(equalToConstant: 28).isActive = true
+        label.lineBreakMode = .byTruncatingTail
+        if window.label == nil {
+            label.widthAnchor.constraint(equalToConstant: 28).isActive = true
+        } else {
+            label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+            label.widthAnchor.constraint(lessThanOrEqualToConstant: 96).isActive = true
+        }
 
         let percent = text("\(window.remainingPercent)% left", size: 12, weight: .medium)
         percent.font = .monospacedDigitSystemFont(ofSize: 12, weight: .medium)
 
         let reset = window.resetsAt.map { "resets \(Self.resetFormatter.string(from: $0))" } ?? "reset unavailable"
         let resetLabel = text(reset, size: 10, color: .secondaryLabelColor)
+        resetLabel.lineBreakMode = .byTruncatingTail
+        resetLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         let spacer = NSView()
 
         let row = NSStackView(views: [label, percent, spacer, resetLabel])

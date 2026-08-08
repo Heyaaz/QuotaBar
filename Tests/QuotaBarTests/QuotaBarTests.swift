@@ -29,6 +29,39 @@ func addsHomebrewToolsToCodexProcessPath() {
     #expect(path?.contains("/opt/homebrew/bin") == true)
     #expect(path?.contains("/usr/local/bin") == true)
 }
+@Test
+func parsesCodexLBAccounts() throws {
+    let json = #"{"accounts":[{"accountId":"a1","email":"first@example.com","alias":"main","status":"active","usage":{"primaryRemainingPercent":20,"secondaryRemainingPercent":42},"resetAtSecondary":"2026-08-15T12:00:00Z","windowMinutesSecondary":10080},{"accountId":"a2","email":"second@example.com","displayName":"second@example.com","status":"active","usage":{"secondaryRemainingPercent":8}},{"accountId":"a3","email":"third@example.com","status":"paused","usage":{"secondaryRemainingPercent":99}}]}"#
+    let snapshot = try CodexLBProvider.parseAccounts(Data(json.utf8), fetchedAt: .distantPast)
+
+    #expect(snapshot.provider == .codex)
+    #expect(snapshot.windows.map(\.shortLabel) == ["main", "second"])
+    #expect(snapshot.windows.map(\.remainingPercent) == [42, 8])
+    #expect(snapshot.windows[0].durationMinutes == 10_080)
+    #expect(snapshot.windows[0].resetsAt != nil)
+    #expect(snapshot.windows[1].resetsAt == nil)
+}
+
+@Test
+func rejectsCodexLBResponseWithoutUsableAccounts() {
+    let noUsage = #"{"accounts":[{"accountId":"a1","status":"active","usage":null}]}"#
+    let noActive = #"{"accounts":[{"accountId":"a1","status":"paused","usage":{"secondaryRemainingPercent":50}}]}"#
+
+    #expect(throws: ProviderError.self) {
+        try CodexLBProvider.parseAccounts(Data(noUsage.utf8), fetchedAt: .distantPast)
+    }
+    #expect(throws: ProviderError.self) {
+        try CodexLBProvider.parseAccounts(Data(noActive.utf8), fetchedAt: .distantPast)
+    }
+}
+
+@Test
+func readsCodexLBAccountsWhenLiveTestsAreEnabled() async throws {
+    guard ProcessInfo.processInfo.environment["QUOTABAR_LIVE_TESTS"] == "1" else { return }
+
+    let snapshot = try await CodexLBProvider().fetch()
+    #expect(!snapshot.windows.isEmpty)
+}
 
 @Test
 func parsesClaudeWindows() throws {
@@ -199,6 +232,30 @@ func decodesCompactMenuBarLogos() {
         #expect(image.size.height == 13)
     }
 }
+@Test
+func alertsMatchLabeledWindowsByAccount() {
+    let previous = ProviderSnapshot(
+        provider: .codex,
+        windows: [
+            QuotaWindow(durationMinutes: 10_080, remainingPercent: 30, resetsAt: nil, label: "main"),
+            QuotaWindow(durationMinutes: 10_080, remainingPercent: 22, resetsAt: nil, label: "backup"),
+        ],
+        fetchedAt: .distantPast
+    )
+    let current = ProviderSnapshot(
+        provider: .codex,
+        windows: [
+            QuotaWindow(durationMinutes: 10_080, remainingPercent: 28, resetsAt: nil, label: "main"),
+            QuotaWindow(durationMinutes: 10_080, remainingPercent: 4, resetsAt: nil, label: "backup"),
+        ],
+        fetchedAt: .distantFuture
+    )
+
+    let alerts = QuotaAlert.crossings(from: previous, to: current)
+    #expect(alerts.count == 1)
+    #expect(alerts[0].windowLabel == "backup")
+    #expect(alerts[0].threshold == 5)
+}
 
 @Test
 func alertsOnlyWhenQuotaCrossesAThreshold() {
@@ -252,4 +309,22 @@ func selectsTheLowestRemainingQuotaForCompactDisplay() {
     #expect(lowest?.provider == .codex)
     #expect(lowest?.window.shortLabel == "W")
     #expect(lowest?.window.remainingPercent == 12)
+}
+
+@Test @MainActor
+func ignoresLabeledAccountWindowsForMenuBarDisplay() {
+    let states: [ProviderID: ProviderState] = [
+        .codex: ProviderState(snapshot: ProviderSnapshot(
+            provider: .codex,
+            windows: [
+                QuotaWindow(durationMinutes: 300, remainingPercent: 50, resetsAt: nil),
+                QuotaWindow(durationMinutes: 10_080, remainingPercent: 5, resetsAt: nil, label: "pion0458"),
+            ],
+            fetchedAt: .distantPast
+        )),
+    ]
+
+    // The account window is the lowest, but labeled windows never drive the menu bar.
+    let lowest = StatusController.lowestQuota(in: states)
+    #expect(lowest?.window.remainingPercent == 50)
 }

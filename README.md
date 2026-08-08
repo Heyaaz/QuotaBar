@@ -1,12 +1,13 @@
 # QuotaBar
 
-QuotaBar is a small, read-only macOS menu bar app that shows the remaining subscription quota exposed by Claude Code, Codex CLI, and Grok Build.
+QuotaBar is a small, read-only macOS menu bar app that shows the remaining subscription quota exposed by Claude Code, Codex CLI, Grok Build, and Kimi. When a local [codex-lb](https://github.com/Soju06/codex-lb) instance is running, the Codex row also lists each routed account.
 
-The menu bar shows all three providers at once, identified by their logos. Each provider displays only the windows it actually returns, such as `5h` and `W`; missing windows are never estimated. If a refresh fails, the last successful value remains visible and the details popover marks it as stale.
+The menu bar shows all providers at once, identified by their logos. Each provider displays only the windows it actually returns, such as `5h` and `W`; missing windows are never estimated. Codex-lb accounts stay out of the menu bar — the details popover lists each active account under the Codex row, labeled with the account's alias, email local part, or account id. If a refresh fails, the last successful value remains visible and the details popover marks it as stale.
 
 ## Features
 
-- Refreshes Claude, Codex, and Grok quota every five minutes using existing OAuth sessions
+- Refreshes Claude, Codex, Grok, and Kimi quota every five minutes using existing OAuth sessions
+- Lists every active codex-lb account as its own row under Codex in the details popover
 - Sends a native notification when a quota first crosses 20% or 5% remaining
 - Offers full and lowest-only menu bar display modes
 - Can launch automatically at login through the gear menu
@@ -17,6 +18,8 @@ The menu bar shows all three providers at once, identified by their logos. Each 
 - Claude Code installed and signed in with a Claude subscription
 - Codex CLI or the ChatGPT desktop app installed and signed in
 - Grok Build installed and signed in with a Grok subscription
+- Kimi CLI installed and signed in with a Kimi subscription
+- Optional: a local codex-lb instance at `http://127.0.0.1:2455` (override with `CODEXBAR_ENDPOINT`) with at least one active account
 
 QuotaBar reuses the official clients' existing OAuth sessions. It does not accept API keys or provide its own login screen.
 
@@ -36,7 +39,7 @@ swift test
 QUOTABAR_LIVE_TESTS=1 swift test
 ```
 
-Live tests require all three clients to be signed in. The packaged app measured 42,544 KB RSS after refreshing all providers, with no persistent child process, on the development Mac.
+Live tests require the relevant clients to be signed in (and a codex-lb instance for the Codex LB test). The packaged app measured 42,544 KB RSS after refreshing all providers, with no persistent child process, on the development Mac.
 
 ## Privacy
 
@@ -44,6 +47,8 @@ Live tests require all three clients to be signed in. The packaged app measured 
 - The local cache contains only quota percentages and timestamps.
 - Claude usage is read with the Claude Code Keychain credential.
 - Codex and Grok usage are read through their official local client protocols.
+- Kimi usage is read through the Kimi CLI.
+- Codex LB usage is read from the local codex-lb server's `GET /api/accounts` endpoint.
 - No browser automation, embedded browser, analytics, or usage history is included.
 
 Claude, OpenAI, and xAI logos are trademarks of their respective owners and are used only to identify the corresponding service.
